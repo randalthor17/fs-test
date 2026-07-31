@@ -27,7 +27,8 @@ typedef struct {
   uint32_t inode_table_start; // starting block index of inode table
   uint32_t num_inode_blocks;  // number of blocks in inode table
   uint32_t bitmap_start;      // starting block index of bitmap
-  uint32_t data_start;        // starting block index of data
+  // NOTE: bitmap will have 0 for free and 1 for occupied
+  uint32_t data_start; // starting block index of data
 } fs_superblock_t;
 
 // then is the inode type
