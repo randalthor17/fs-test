@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,9 +92,46 @@ error_t zero_bitmap_block(fd_t file, fs_superblock_t superblock) {
   return 0;
 }
 
+error_t write_root_inode(fd_t file, fs_superblock_t superblock) {
+  fs_inode_t root_inode = {
+      .type = FS_TYPE_DIR,
+      .mode = 0755,
+      .size = 2 * sizeof(fs_dirent_t),
+      .direct = {superblock.data_start},
+  };
+  ssize_t written =
+      pwrite(file, &root_inode, sizeof(root_inode),
+             superblock.inode_table_start * superblock.block_size);
+  if (written != (ssize_t)sizeof(root_inode))
+    return -1;
+  return 0;
+}
+
+error_t write_root_data_block(fd_t file, fs_superblock_t superblock) {
+  unsigned char temp_buf[superblock.block_size];
+  memset(temp_buf, 0, sizeof(temp_buf));
+  fs_dirent_t *entries = (fs_dirent_t *)temp_buf;
+  size_t entries_per_block = superblock.block_size / sizeof(fs_dirent_t);
+  for (size_t i = 0; i < entries_per_block; i++) {
+    entries[i].inode = FS_DIRENT_EMPTY; // initialize all as empty
+  }
+  // current dir
+  strncpy(entries[0].name, ".", FS_MAX_FILENAME_SIZE);
+  entries[0].inode = 0; // root
+  // root is its own parent
+  strncpy(entries[1].name, "..", FS_MAX_FILENAME_SIZE);
+  entries[1].inode = 0;
+  // write
+  ssize_t written = pwrite(file, temp_buf, sizeof(temp_buf),
+                           superblock.data_start * superblock.block_size);
+  if (written != (ssize_t)sizeof(temp_buf))
+    return -1;
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 3) {
-    printf("mkfs requires image path and size of the image.\n");
+    printf("mkfs requires image path and size of the image (in blocks).\n");
     return -1;
   }
   // first arg is image path, 2nd is size
@@ -115,33 +153,51 @@ int main(int argc, char *argv[]) {
   fd_t file = open(dev_name, O_RDWR | O_CREAT | O_TRUNC,
                    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   if (file == -1) {
-    fprintf(stderr, "Opening file failed.\n");
+    fprintf(stderr, "Error opening file.\n");
     return errno;
   }
 
   // try to truncate file to size
   error_t ftrunc_err = ftruncate(file, size_bytes);
   if (ftrunc_err == -1) {
-    fprintf(stderr, "Truncating file failed.\n");
+    fprintf(stderr, "Error truncating file.\n");
     return errno;
   }
 
   // try to write superblock to file
   error_t write_superblock_err = write_superblock(file, superblock);
   if (write_superblock_err == -1) {
-    fprintf(stderr, "Writing superblock failed.\n");
+    fprintf(stderr, "Error writing superblock.\n");
     return errno;
   }
 
   // try to zero out inode table
   error_t zero_inode_table_err = zero_inode_table(file, superblock);
   if (zero_inode_table_err == -1) {
-    fprintf(stderr, "Writing empty inode table failed.\n");
+    fprintf(stderr, "Error writing empty inode table.\n");
     return errno;
   }
   error_t zero_bitmap_block_err = zero_bitmap_block(file, superblock);
   if (zero_bitmap_block_err == -1) {
-    fprintf(stderr, "Writing empty bitmap block failed.\n");
+    fprintf(stderr, "Error writing empty bitmap block.\n");
+    return errno;
+  }
+
+  error_t write_root_inode_err = write_root_inode(file, superblock);
+  if (write_root_inode_err == -1) {
+    fprintf(stderr, "Error writing root inode.\n");
+    return errno;
+  }
+
+  error_t write_root_data_err = write_root_data_block(file, superblock);
+  if (write_root_data_err == -1) {
+    fprintf(stderr, "Error writing root data block.\n");
+    return errno;
+  }
+
+  error_t close_err = close(file);
+  if (close_err == -1) {
+    fprintf(stderr, "Error closing file.\n");
     return errno;
   }
 
