@@ -14,7 +14,7 @@
 
 #define DIRECT_BLOCK_POINTER_PER_INODE 8 // 8 is a good balance for a small FS
 
-#define MAX_FILENAME_SIZE 64 // 63 maximum characters in filename
+#define FS_MAX_FILENAME_SIZE 59 // 59 maximum characters in filename
 
 #define FS_DIRENT_EMPTY ((uint32_t)-1) // 0xFFFFFFFF
 
@@ -32,19 +32,32 @@ typedef struct {
 } fs_superblock_t;
 
 // then is the inode type
+// NOTE: Adding all these gets inode size to 64 bytes
 typedef struct {
   uint32_t type;
-  // NOTE:  1 for file, 2 for dir, 3 for symlink and so on, and 0 for empty
-  // will switch to enums later
   uint32_t size; // size of the file
   uint32_t mode; // this will have the permission octet, i presume
+  uint32_t created_at;
+  uint32_t modified_at;
   uint32_t direct[DIRECT_BLOCK_POINTER_PER_INODE]; // this stores block indices
+  uint32_t single_indirect;
+  uint32_t double_indirect;
+  uint32_t reserved; // for padding
 } fs_inode_t;
 
+// NOTE:  1 for file, 2 for dir, 3 for symlink and so on, and 0 for empty
+typedef enum {
+  FS_TYPE_FREE = 0,
+  FS_TYPE_FILE = 1,
+  FS_TYPE_DIR = 2,
+  FS_TYPE_SYMLINK = 3,
+} fs_inode_type_t;
+
 // then is the directory entry, i.e. a file entry in a directory
+// NOTE: Setting MAX_FILENAME_SIZE gets dirent size to 64 bytes, perfect
 typedef struct {
-  char name[MAX_FILENAME_SIZE]; // filename
-  uint32_t inode;               // inode index corresponding to the file
+  char name[FS_MAX_FILENAME_SIZE + 1]; // filename
+  uint32_t inode;                      // inode index corresponding to the file
   // NOTE: that we use -1 as indication that the directory is empty
 } fs_dirent_t;
 
