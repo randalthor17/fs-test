@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #define NUM_INODES 1024
@@ -95,11 +96,15 @@ error_t zero_bitmap_block(fd_t file, fs_superblock_t superblock) {
 }
 
 error_t write_root_inode(fd_t file, fs_superblock_t superblock) {
+  // set created_at and modified_at
+  time_t timestamp = time(NULL);
   fs_inode_t root_inode = {
       .type = FS_TYPE_DIR,
       .mode = 0755,
       .size = 2 * sizeof(fs_dirent_t),
       .direct = {superblock.data_start},
+      .created_at = timestamp,
+      .modified_at = timestamp,
   };
   ssize_t written =
       pwrite(file, &root_inode, sizeof(root_inode),
