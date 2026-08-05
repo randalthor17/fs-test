@@ -1,4 +1,5 @@
 #include "fs_test.h"
+#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -38,6 +39,7 @@ init_fs_error_t init_fs(uint64_t size_bytes) {
       ceil((double)size_bytes / superblock.block_size);
 
   if (superblock.data_start >= superblock.num_blocks_total) {
+    errno = ENOSPC;
     return (init_fs_error_t){.superblock = (fs_superblock_t){0}, .error = -1};
   } else {
     return (init_fs_error_t){.superblock = superblock, .error = 0};
@@ -131,8 +133,9 @@ error_t write_root_data_block(fd_t file, fs_superblock_t superblock) {
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
-    printf("mkfs requires image path and size of the image (in blocks).\n");
-    return -1;
+    errno = EINVAL;
+    perror("mkfs requires image path and size of the image (in blocks).\n");
+    return errno;
   }
   // first arg is image path, 2nd is size
   char dev_name[1024];
@@ -142,10 +145,9 @@ int main(int argc, char *argv[]) {
   uint64_t size_bytes = (uint64_t)atoi(argv[2]) * FS_BLOCK_SIZE;
   // try to initialize superblock
   init_fs_error_t superblock_init_err = init_fs(size_bytes);
-  if (superblock_init_err.error != 0) {
-    fprintf(stderr,
-            "Initialization failed, metadata blocks exceed total blocks.\n");
-    return superblock_init_err.error;
+  if (superblock_init_err.error == -1) {
+    perror("Initialization failed, metadata blocks exceed total blocks.\n");
+    return errno;
   }
   fs_superblock_t superblock = superblock_init_err.superblock;
 
@@ -153,50 +155,43 @@ int main(int argc, char *argv[]) {
   fd_t file = open(dev_name, O_RDWR | O_CREAT | O_TRUNC,
                    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   if (file == -1) {
-    fprintf(stderr, "Error opening file.\n");
+    perror("Error opening file.\n");
     return errno;
   }
 
   // try to truncate file to size
-  error_t ftrunc_err = ftruncate(file, size_bytes);
-  if (ftrunc_err == -1) {
-    fprintf(stderr, "Error truncating file.\n");
+  if (ftruncate(file, size_bytes) == -1) {
+    perror("Error truncating file.\n");
     return errno;
   }
 
   // try to write superblock to file
-  error_t write_superblock_err = write_superblock(file, superblock);
-  if (write_superblock_err == -1) {
-    fprintf(stderr, "Error writing superblock.\n");
+  if (write_superblock(file, superblock) == -1) {
+    perror("Error writing superblock.\n");
     return errno;
   }
 
   // try to zero out inode table
-  error_t zero_inode_table_err = zero_inode_table(file, superblock);
-  if (zero_inode_table_err == -1) {
-    fprintf(stderr, "Error writing empty inode table.\n");
+  if (zero_inode_table(file, superblock) == -1) {
+    perror("Error writing empty inode table.\n");
     return errno;
   }
-  error_t zero_bitmap_block_err = zero_bitmap_block(file, superblock);
-  if (zero_bitmap_block_err == -1) {
-    fprintf(stderr, "Error writing empty bitmap block.\n");
-    return errno;
-  }
-
-  error_t write_root_inode_err = write_root_inode(file, superblock);
-  if (write_root_inode_err == -1) {
-    fprintf(stderr, "Error writing root inode.\n");
+  if (zero_bitmap_block(file, superblock) == -1) {
+    perror("Error writing empty bitmap block.\n");
     return errno;
   }
 
-  error_t write_root_data_err = write_root_data_block(file, superblock);
-  if (write_root_data_err == -1) {
-    fprintf(stderr, "Error writing root data block.\n");
+  if (write_root_inode(file, superblock) == -1) {
+    perror("Error writing root inode.\n");
     return errno;
   }
 
-  error_t close_err = close(file);
-  if (close_err == -1) {
+  if (write_root_data_block(file, superblock) == -1) {
+    perror("Error writing root data block.\n");
+    return errno;
+  }
+
+  if (close(file) == -1) {
     fprintf(stderr, "Error closing file.\n");
     return errno;
   }
