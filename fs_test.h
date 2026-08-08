@@ -12,7 +12,8 @@
 
 #define FS_MAGIC_NUMBER 0x52616E64 // Rand-FS
 
-#define DIRECT_BLOCK_POINTER_PER_INODE 7 // 7 is a good balance for a small FS
+#define FS_DIRECT_BLOCK_POINTER_PER_INODE                                      \
+  7 // 7 is a good balance for a small FS
 
 #define FS_MAX_FILENAME_SIZE 59 // 59 maximum characters in filename
 
@@ -50,7 +51,9 @@ typedef struct {
   uint32_t type;
   uint32_t size; // size of the file
   uint32_t mode; // this will have the permission octet, i presume
-  uint32_t direct[DIRECT_BLOCK_POINTER_PER_INODE]; // this stores block indices
+  uint32_t
+      direct[FS_DIRECT_BLOCK_POINTER_PER_INODE]; // this stores block indices
+  // NOTE: if there's no single or double indirect, we set them to max value
   uint32_t single_indirect;
   uint32_t double_indirect;
 } fs_inode_t;
