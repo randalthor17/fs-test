@@ -103,6 +103,8 @@ error_t write_root_inode(fd_t file, fs_superblock_t superblock) {
       .mode = 0755,
       .size = 2 * sizeof(fs_dirent_t),
       .direct = {superblock.data_start},
+      .single_indirect = 0,
+      .double_indirect = 0,
       .created_at = timestamp,
       .modified_at = timestamp,
   };
