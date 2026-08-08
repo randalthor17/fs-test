@@ -1,7 +1,7 @@
 // we declare the structure of the fs here
 
-#ifndef FS_TEST_H
-#define FS_TEST_H
+#ifndef RANDFS_H
+#define RANDFS_H
 
 // first, let's declare some properties:
 //
@@ -68,4 +68,4 @@ typedef struct {
 
 #pragma pack(pop)
 
-#endif // !FS_TEST_H
+#endif // !RANDFS_H
