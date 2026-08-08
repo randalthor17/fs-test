@@ -53,6 +53,18 @@ fn format_dirent_inode(u32 inode_idx) {
     return std::format("Inode #{}", inode_idx);
 };
 
+// Bitfield mapping LSB to MSB (b0 = LSB = Block +0, b7 = MSB = Block +7)
+bitfield BitmapByte {
+    b0 : 1 [[comment("Block +0")]];
+    b1 : 1 [[comment("Block +1")]];
+    b2 : 1 [[comment("Block +2")]];
+    b3 : 1 [[comment("Block +3")]];
+    b4 : 1 [[comment("Block +4")]];
+    b5 : 1 [[comment("Block +5")]];
+    b6 : 1 [[comment("Block +6")]];
+    b7 : 1 [[comment("Block +7")]];
+};
+
 // Inode Struct (64 Bytes)
 struct FsInode {
     FsInodeType type;
@@ -81,7 +93,6 @@ struct DirectoryBlock {
 FsSuperblock superblock @ 0x00;
 
 // Helper struct to group the Inode Table neatly by Inodes
-// (Referencing global `superblock` directly instead of `parent.superblock`)
 struct InodeTable {
     FsInode inodes[superblock.num_inodes];
 };
@@ -95,7 +106,7 @@ struct DataRegion {
 InodeTable inode_table @ (superblock.inode_table_start * superblock.block_size);
 
 // 2. Block Bitmap
-u8 block_bitmap[(superblock.data_start - superblock.bitmap_start) * superblock.block_size] @ (superblock.bitmap_start * superblock.block_size);
+BitmapByte block_bitmap[(superblock.data_start - superblock.bitmap_start) * superblock.block_size] @ (superblock.bitmap_start * superblock.block_size);
 
 // 3. Data Blocks Region: Divided into Directory Blocks containing 64 `dirents` each
 DataRegion data_blocks @ (superblock.data_start * superblock.block_size);
