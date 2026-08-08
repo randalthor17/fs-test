@@ -86,7 +86,11 @@ error_t set_index_buf_occupied(unsigned char *buf, uint64_t size,
 error_t zero_bitmap_block(fd_t file, fs_superblock_t superblock) {
   unsigned char temp_zero_buf[superblock.block_size];
   memset(temp_zero_buf, 0, sizeof(temp_zero_buf));
-  set_index_buf_occupied(temp_zero_buf, sizeof(temp_zero_buf), 0);
+  // everything before the data blocks must be set to occupied
+  // so that they don't get overwritten
+  for (uint32_t i = 0; i < superblock.data_start; i++) {
+    set_index_buf_occupied(temp_zero_buf, sizeof(temp_zero_buf), i);
+  }
 
   ssize_t written = pwrite(file, &temp_zero_buf, superblock.block_size,
                            superblock.bitmap_start * superblock.block_size);
